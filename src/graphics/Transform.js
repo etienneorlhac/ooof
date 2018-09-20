@@ -65,6 +65,20 @@ export default
         quat.normalize(this.rotation, this.rotation);
     }
 
+    /**
+     * @param {vec3} eye 
+     * @param {vec3} target 
+     * @param {vec3} up 
+     */
+    lookAt(eye, target, up = [0, 1, 0]) {
+        const lookAtM4 = mat4.create();
+        mat4.targetTo(lookAtM4, eye, target, up);
+        const lookAtM3 = mat3.create();
+        mat3.fromMat4(lookAtM3, lookAtM4);
+        quat.fromMat3(this.rotation, lookAtM3);
+        quat.normalize(this.rotation, this.rotation);
+    }
+
     forward() {
         const axis = [0, 0, 1];
         return vec3.transformQuat(axis, axis, this.rotation);

@@ -30,47 +30,60 @@ function main(canvas, gl, models) {
     em.spawn([models.map, new Transform()]);
 
     const player = em.spawn([models.character, new Transform()]);
-    player.get(Transform).move([0, 1.5, 19]);
+    player.get(Transform).move([0, 7, 19]);
 
     const render = createRenderPipeline(em, gl);
 
     const camera = new Transform();
 
+    const momentum = vec3.create();
+    const accel = 0.1
+    const decel = 0.2;
+    const maxSpeed = 0.2;
+    const walkMultiplier = 0.5;
+
     function mainloop() {
+        let dir = vec3.create();
 
-        const speed = 0.2;
-        const dir = vec3.create();
+        if (keys.z) vec3.add(dir, dir, [0, 0, -1]);
+        if (keys.s) vec3.add(dir, dir, [0, 0, 1]);
+        if (keys.q) vec3.add(dir, dir, [-1, 0, 0]);
+        if (keys.d) vec3.add(dir, dir, [1, 0, 0]);
 
-        if (keys.z) vec3.add(dir, dir, player.get(Transform).back());
-        if (keys.s) vec3.add(dir, dir, player.get(Transform).forward());
-        dir[1] = 0;
-        if (keys.q) vec3.add(dir, dir, player.get(Transform).left());
-        if (keys.d) vec3.add(dir, dir, player.get(Transform).right());
+        vec3.normalize(dir, dir);
 
-        if (keys[" "]) vec3.add(dir, dir, [0, 1, 0]);
-        if (keys.shift) vec3.add(dir, dir, [0, -1, 0]);
+        if (keys.shift) {
+            vec3.scale(dir, dir, maxSpeed * walkMultiplier);
+        } else {
+            vec3.scale(dir, dir, maxSpeed);
+        }
+
+        if (vec3.length(dir) > vec3.length(momentum)) {
+            vec3.lerp(momentum, momentum, dir, accel);
+        } else {
+            vec3.lerp(momentum, momentum, dir, decel);
+        }
+
+        player.get(Transform).move(momentum);
 
         if (vec3.length(dir) > 1e-5) {
-            vec3.normalize(dir, dir);
-            vec3.scale(dir, dir, speed);
+            const t = new Transform();
+            const characterTarget = vec3.create();
+            vec3.add(characterTarget, player.get(Transform).position, momentum);
+            t.lookAt(player.get(Transform).position, characterTarget);
 
-            player.get(Transform).move(dir);
+            quat.slerp(player.get(Transform).rotation, player.get(Transform).rotation, t.rotation, 0.2);
         }
 
         const target = vec3.create();
-        vec3.add(target, player.get(Transform).position, [0, 10, 10]);
-        vec3.lerp(camera.position, camera.position, target, 0.05);
+        vec3.add(target, player.get(Transform).position, [0, 25, 25]);
+        vec3.lerp(camera.position, camera.position, target, 1);
 
-        const lookAtM4 = mat4.create();
-        mat4.targetTo(lookAtM4, camera.position, player.get(Transform).position, [0, 1, 0]);
-        const lookAtM3 = mat3.create();
-        mat3.fromMat4(lookAtM3, lookAtM4);
-        const lookAtQuat = quat.create();
-        quat.fromMat3(lookAtQuat, lookAtM3);
+        camera.lookAt(camera.position, player.get(Transform).position);
 
-        camera.rotation = lookAtQuat;
+        const light = player.get(Transform).position;
 
-        render(camera);
+        render(camera, light);
         requestAnimationFrame(mainloop);
     }
     mainloop();

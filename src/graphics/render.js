@@ -14,22 +14,27 @@ const vsSource = `
     uniform mat3 uNormalMatrix;
 
     varying vec3 pos;
-    varying float diffuse;
+    varying vec3 normal;
 
     void main() {
-        diffuse = dot(uNormalMatrix * aVertexNormal.xyz, vec3(0.0,0.5,0.7));
-        pos = aVertexPosition.xyz;
+        pos = (uModelMatrix * aVertexPosition).xyz;
+        normal = (uNormalMatrix * aVertexNormal.xyz);
         gl_Position = uProjectionMatrix * uViewMatrix * uModelMatrix * aVertexPosition;
     }
 `;
 
 const fsSource = `
+    uniform lowp vec3 lightPos;
+
     varying lowp vec3 pos;
-    varying lowp float diffuse;
+    varying lowp vec3 normal;
 
     void main() {
-        lowp float color = 1.0;
-        gl_FragColor = vec4(color*diffuse, color*diffuse, color*diffuse, 1.0);
+        lowp vec3 offset = vec3(0.0,3.0,0.0);
+        lowp vec3 toLight = lightPos + offset - pos;
+        lowp float mdist = distance(pos, lightPos + offset)/50.0;
+        lowp float falloff = max(0.0,1.0-(mdist*mdist));
+        gl_FragColor = vec4(vec3(dot(normal, normalize(toLight))*falloff), 1.0);
     }
 `;
 
@@ -50,7 +55,8 @@ export function createRenderPipeline(em, gl) {
         uProjectionMatrix: gl.getUniformLocation(program, 'uProjectionMatrix'),
         uModelMatrix: gl.getUniformLocation(program, 'uModelMatrix'),
         uViewMatrix: gl.getUniformLocation(program, 'uViewMatrix'),
-        uNormalMatrix: gl.getUniformLocation(program, 'uNormalMatrix')
+        uNormalMatrix: gl.getUniformLocation(program, 'uNormalMatrix'),
+        lightPos: gl.getUniformLocation(program, 'lightPos')
     };
 
     function fixPerspective() {
@@ -79,7 +85,7 @@ export function createRenderPipeline(em, gl) {
     gl.useProgram(program);
     fixPerspective();
 
-    return function (camera) {
+    return function (camera, light) {
         gl.enable(gl.DEPTH_TEST);
         gl.clear(gl.COLOR_BUFFER_BIT, gl.DEPTH_BUFFER_BIT);
 
@@ -99,6 +105,7 @@ export function createRenderPipeline(em, gl) {
                 programInfo.uNormalMatrix,
                 false,
                 e.get(Transform).getRotationMatrix());
+            gl.uniform3fv(programInfo.lightPos, light);
             e.get(Model).draw(programInfo);
         });
     }
