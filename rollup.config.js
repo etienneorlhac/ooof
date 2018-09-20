@@ -15,6 +15,6 @@ export default {
         // load cjs
         commonjs(),
         // uglify
-        //terser()
+        terser()
     ]
 };   
